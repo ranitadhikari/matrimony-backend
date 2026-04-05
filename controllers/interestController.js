@@ -52,7 +52,7 @@ exports.getReceivedInterests = async (req, res) => {
   try {
     const interests = await Interest.find({ toUser: req.user.id }).populate(
       "fromUser",
-      "name email",
+      "name email phone",
     );
 
     res.json(interests);
@@ -66,7 +66,7 @@ exports.getSentInterests = async (req, res) => {
   try {
     const interests = await Interest.find({ fromUser: req.user.id }).populate(
       "toUser",
-      "name email",
+      "name email phone",
     );
 
     res.json(interests);

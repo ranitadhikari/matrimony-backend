@@ -21,8 +21,8 @@ exports.createProfile = async (req, res) => {
       ...req.body,
       photos: photoUrls,
       user: req.user.id,
-      email: user.email,   // ✅ auto
-      phone: user.phone, 
+      email: req.user.email,   // ✅ auto
+      phone: req.user.phone, 
     });
 
     res.status(201).json({
