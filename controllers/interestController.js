@@ -8,7 +8,9 @@ exports.sendInterest = async (req, res) => {
     const { toUserId } = req.body;
 
     if (req.user.id === toUserId) {
-      return res.status(400).json({ message: "Cannot send interest to yourself" });
+      return res
+        .status(400)
+        .json({ message: "Cannot send interest to yourself" });
     }
 
     const existing = await Interest.findOne({
@@ -40,7 +42,6 @@ exports.sendInterest = async (req, res) => {
     });
 
     res.json({ message: "Interest sent", interest });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -49,11 +50,12 @@ exports.sendInterest = async (req, res) => {
 // 📥 GET RECEIVED REQUESTS
 exports.getReceivedInterests = async (req, res) => {
   try {
-    const interests = await Interest.find({ toUser: req.user.id })
-      .populate("fromUser", "name email");
+    const interests = await Interest.find({ toUser: req.user.id }).populate(
+      "fromUser",
+      "name email",
+    );
 
     res.json(interests);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -62,11 +64,12 @@ exports.getReceivedInterests = async (req, res) => {
 // 📤 GET SENT REQUESTS
 exports.getSentInterests = async (req, res) => {
   try {
-    const interests = await Interest.find({ fromUser: req.user.id })
-      .populate("toUser", "name email");
+    const interests = await Interest.find({ fromUser: req.user.id }).populate(
+      "toUser",
+      "name email",
+    );
 
     res.json(interests);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -96,13 +99,30 @@ exports.respondInterest = async (req, res) => {
 
     // 📩 Email to sender (same logic as confirmation mail in your lead system)
     if (status === "accepted") {
+      // ✅ EMAIL TO SENDER
       await sendEmail({
         to: sender.email,
-        subject: "🎉 Your Request is Accepted",
+        subject: "🎉 Match Found!",
         html: `
-          <h2>Hello ${sender.name},</h2>
-          <p><strong>${receiver.name}</strong> accepted your interest ❤️</p>
-        `,
+      <h2>Congratulations ❤️</h2>
+      <p>${receiver.name} accepted your request</p>
+      <h3>Contact Details:</h3>
+      <p>Email: ${receiver.email}</p>
+      <p>Phone: ${receiver.phone}</p>
+    `,
+      });
+
+      // ✅ EMAIL TO RECEIVER
+      await sendEmail({
+        to: receiver.email,
+        subject: "🎉 Match Found!",
+        html: `
+      <h2>Congratulations ❤️</h2>
+      <p>You accepted ${sender.name}</p>
+      <h3>Contact Details:</h3>
+      <p>Email: ${sender.email}</p>
+      <p>Phone: ${sender.phone}</p>
+    `,
       });
     }
 
@@ -118,6 +138,34 @@ exports.respondInterest = async (req, res) => {
     }
 
     res.json({ message: `Request ${status}`, interest });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+exports.getContactIfMatched = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const interest = await Interest.findOne({
+      fromUser: userId,
+      toUser: req.user.id,
+      status: "accepted",
+    });
+
+    if (!interest) {
+      return res.json({
+        matched: false,
+        message: "Contact hidden",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    res.json({
+      matched: true,
+      email: user.email,
+      phone: user.phone,
+    });
 
   } catch (error) {
     res.status(500).json({ message: error.message });
