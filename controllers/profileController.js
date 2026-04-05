@@ -1,43 +1,57 @@
 const Profile = require("../models/Profile");
+// ✅ FIXED CREATE PROFILE
 exports.createProfile = async (req, res) => {
   try {
-    console.log("BODY 👉", req.body);       // ✅ debug
-    console.log("FILES 👉", req.files);     // ✅ debug
-
     const existing = await Profile.findOne({ user: req.user.id });
     if (existing) {
-      return res.status(400).json({
-        message: "Profile already exists",
-      });
+      return res.status(400).json({ message: "Profile already exists" });
     }
 
     let photoUrls = [];
-
     if (req.files && req.files.length > 0) {
       photoUrls = req.files.map((file) => file.path);
     }
 
+    // 1. Extract fields from req.body
+    const {
+      fullName, age, gender, height, religion, caste,
+      maritalStatus, education, occupation, income, location, about,
+      hasDisability, disabilityDetails, email, phone
+    } = req.body;
+
+    // 2. Create the profile with the correct structure
     const profile = await Profile.create({
-      ...req.body,
-      photos: photoUrls,
+      fullName,
+      age,
+      gender,
+      height,
+      religion,
+      caste,
+      maritalStatus,
+      education,
+      occupation,
+      income,
+      location,
+      about,
       user: req.user.id,
-      email: req.body.email || req.user.email,   
-      phone: req.body.phone || req.user.phone, 
+      email: email || req.user.email,
+      phone: phone || req.user.phone,
+      photos: photoUrls,
+      // ✅ Map flat fields to nested object
+      disability: {
+        hasDisability: hasDisability === 'true',
+        details: disabilityDetails || ''
+      }
     });
 
     res.status(201).json({
       message: "Profile created successfully",
       profile,
     });
-
   } catch (error) {
-  console.error("FULL ERROR 👉", error);
-
-  res.status(500).json({
-    message: error.message,
-    stack: error.stack,
-  });
-}
+    console.error("CREATE PROFILE ERROR 👉", error);
+    res.status(500).json({ message: error.message });
+  }
 };
 // ✅ GET MY PROFILE
 exports.getMyProfile = async (req, res) => {
@@ -57,37 +71,42 @@ exports.getMyProfile = async (req, res) => {
   }
 };
 // ✅ UPDATE PROFILE
+// ✅ FIXED UPDATE PROFILE
 exports.updateProfile = async (req, res) => {
   try {
     const profile = await Profile.findOne({ user: req.user.id });
-
     if (!profile) {
-      return res.status(404).json({
-        message: "Profile not found",
-      });
+      return res.status(404).json({ message: "Profile not found" });
     }
 
-    // update fields
-    Object.keys(req.body).forEach((key) => {
-      profile[key] = req.body[key];
+    // Update standard fields
+    const fieldsToUpdate = [
+      'fullName', 'age', 'gender', 'height', 'religion', 'caste',
+      'maritalStatus', 'education', 'occupation', 'income', 'location', 'about',
+      'email', 'phone'
+    ];
+
+    fieldsToUpdate.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        profile[field] = req.body[field];
+      }
     });
 
-    // update photos if new uploaded
-    if (req.files && req.files.length > 0) {
-      const newPhotos = req.files.map((file) => file.path);
+    // ✅ Update nested disability object
+    if (req.body.hasDisability !== undefined) {
+      profile.disability = {
+        hasDisability: req.body.hasDisability === 'true',
+        details: req.body.disabilityDetails || profile.disability?.details || ''
+      };
+    }
 
-      // replace OR append (your choice)
-      profile.photos = newPhotos; // replace
-      // profile.photos.push(...newPhotos); // append
+    // Update photos if new ones uploaded
+    if (req.files && req.files.length > 0) {
+      profile.photos = req.files.map((file) => file.path);
     }
 
     await profile.save();
-
-    res.json({
-      message: "Profile updated successfully",
-      profile,
-    });
-
+    res.json({ message: "Profile updated successfully", profile });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
